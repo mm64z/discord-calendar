@@ -1,6 +1,7 @@
 import type Konva from 'konva';
 import React, { useState } from 'react';
 import { Stage, Layer, Group, Rect, Text } from 'react-konva';
+import { BACKGROUND_COLOR, SELECTED_COLOR, STICKER_CHOICES } from './const';
 
 interface NoteMap {
   [date: string]: string;       // YYYY‑MM‑DD → note text
@@ -38,10 +39,9 @@ const App: React.FC = () => {
   const year = today.getFullYear();
   const month = today.getMonth();
 
-  const STICKER_CHOICES = ['🌟', '📌', '🎂', '🐱', '✅'];
 
   const [mode, setMode] = useState<'sticker' | 'select'>('sticker');
-  const [selectedSticker, setSelSticker] = useState<string | null>(STICKER_CHOICES[0]);
+  const [selectedSticker, setSelSticker] = useState<string | null>(STICKER_CHOICES[0].emoji);
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [notes, setNotes] = useState<NoteMap>({});
   const [editing, setEditing] = useState<string | null>(null);
@@ -61,8 +61,8 @@ const App: React.FC = () => {
         {
           id   : Math.random().toString(36).slice(2),
           emoji: selectedSticker,
-          x    : pos.x,
-          y    : pos.y,
+          x    : pos.x - 15,
+          y    : pos.y - 8,
           // date : mapPosToDate(pos.x, pos.y),
         },
       ]);
@@ -175,13 +175,13 @@ const App: React.FC = () => {
             padding: '0.2rem 0.4rem',
             borderRadius: '8px',
             border: '1px solid #aaa',
-            background: mode === 'select' ? '#d0f0ff' : '#fff',
+            background: mode === 'select' ? SELECTED_COLOR : BACKGROUND_COLOR,
             cursor: 'pointer',
           }}
         >
           📝 Select mode
         </button>
-        {STICKER_CHOICES.map((emoji) => (
+        {STICKER_CHOICES.map(({ emoji }) => (
           <button
             key={emoji}
             onClick={() => {setSelSticker(emoji);setMode('sticker')}}
@@ -191,7 +191,7 @@ const App: React.FC = () => {
               padding: '0.2rem 0.4rem',
               borderRadius: '8px',
               border: '1px solid #aaa',
-              background: emoji === selectedSticker ? '#d0f0ff' : '#fff',
+              background: emoji === selectedSticker ? SELECTED_COLOR : BACKGROUND_COLOR,
               cursor: 'pointer',
             }}
           >
