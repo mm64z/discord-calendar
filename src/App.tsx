@@ -2,9 +2,8 @@ import type Konva from 'konva';
 import React, { useState } from 'react';
 import { Stage, Layer, Group, Rect, Text } from 'react-konva';
 
-interface CalendarEvent {
-  date: string; // YYYY-MM-DD
-  title: string;
+interface NoteMap {
+  [date: string]: string;       // YYYY‑MM‑DD → note text
 }
 
 interface Sticker {
@@ -28,7 +27,7 @@ const getDaysInMonth = (year: number, month: number): Date[] => {
   return days;
 };
 
-function formatDate(date: Date) {
+function dateKey(date: Date) {
   // currently YYYY-MM-DD
   return date.toISOString().split('T')[0];
 }
@@ -40,36 +39,58 @@ const App: React.FC = () => {
   const month = today.getMonth();
 
   const STICKER_CHOICES = ['🌟', '📌', '🎂', '🐱', '✅'];
-  const [selectedSticker, setSelectedSticker] = useState<string>('🌟');
+
+  const [mode, setMode] = useState<'sticker' | 'select'>('sticker');
+  const [selectedSticker, setSelSticker] = useState<string | null>(STICKER_CHOICES[0]);
   const [stickers, setStickers] = useState<Sticker[]>([]);
-
-  const days = getDaysInMonth(year, month);
-  const startOffset = new Date(year, month, 1).getDay(); // Sunday = 0
-
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [notes, setNotes] = useState<NoteMap>({});
+  const [editing, setEditing] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState('');
 
+  const days = getDaysInMonth(year, month);
+  const startOffset = new Date(year, month, 1).getDay(); // Sun=0
 
-  const handleDayClick = (date: string) => {
-    setEditingDate(date);
-    setNoteInput(notes[date] || '');
-  };
-  
   const handleCanvasClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const pos = e.target.getStage()?.getPointerPosition();
+    const pos  = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
 
-    const newSticker: Sticker = {
-      id: Math.random().toString(36).substring(2),
-      emoji: selectedSticker,
-      x: pos.x,
-      y: pos.y,
-      // date: '', // optional: could still map to a date using x/y
-    };
+    if (mode === 'sticker' && selectedSticker) {
+      // place sticker exactly where clicked
+      setStickers(prev => [
+        ...prev,
+        {
+          id   : Math.random().toString(36).slice(2),
+          emoji: selectedSticker,
+          x    : pos.x,
+          y    : pos.y,
+          // date : mapPosToDate(pos.x, pos.y),
+        },
+      ]);
+      return;
+    }
 
-    setStickers([...stickers, newSticker]);
-};
+    // SELECT mode – open note editor for the clicked day (if in bounds)
+    const dKey = mapPosToDate(pos.x, pos.y);
+    if (dKey) {
+      setEditing(dKey);
+      setNoteInput(notes[dKey] || '');
+    }
+  };
+  
+  const mapPosToDate = (x: number, y: number): string | null => {
+    const col = Math.floor(x / CELL_WIDTH);
+    const row = Math.floor(y / CELL_HEIGHT);
+    const dayIdx = row * NUM_COLS + col - startOffset;
+    if (dayIdx < 0 || dayIdx >= days.length) return null;
+    return dateKey(days[dayIdx]);
+  };  
+  
+  const saveNote = () => {
+    if (!editing) return;
+    setNotes({ ...notes, [editing]: noteInput });
+    setEditing(null);
+    setNoteInput('');
+  };
 
   const handleDragMove = (id: string, pos: { x: number; y: number }) => {
     setStickers((prev) =>
@@ -96,7 +117,6 @@ const App: React.FC = () => {
             return (
               <Group
                 key={dateKey}
-                onClick={() => handleDayClick(dateKey)}
               >
                 <Rect
                   x={x}
@@ -147,43 +167,50 @@ const App: React.FC = () => {
         </Layer>
       </Stage>
       <div style={{ margin: '1rem', textAlign: 'center' }}>
+        <button
+          onClick={() => {setMode('select');setSelSticker(null)}}
+          style={{
+            fontSize: '1.6rem',
+            margin: '0 0.4rem',
+            padding: '0.2rem 0.4rem',
+            borderRadius: '8px',
+            border: '1px solid #aaa',
+            background: mode === 'select' ? '#d0f0ff' : '#fff',
+            cursor: 'pointer',
+          }}
+        >
+          📝 Select mode
+        </button>
         {STICKER_CHOICES.map((emoji) => (
           <button
             key={emoji}
+            onClick={() => {setSelSticker(emoji);setMode('sticker')}}
             style={{
-              fontSize: '1.5rem',
-              margin: '0 0.5rem',
-              background: emoji === selectedSticker ? '#ddd' : 'white',
-              borderRadius: '0.5rem',
-              padding: '0.25rem 0.5rem',
-              border: '1px solid #ccc',
+              fontSize: '1.6rem',
+              margin: '0 0.4rem',
+              padding: '0.2rem 0.4rem',
+              borderRadius: '8px',
+              border: '1px solid #aaa',
+              background: emoji === selectedSticker ? '#d0f0ff' : '#fff',
               cursor: 'pointer',
             }}
-            onClick={() => setSelectedSticker(emoji)}
           >
             {emoji}
           </button>
         ))}
       </div>
-      {editingDate && (
+      {editing && (
         <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-          <h3>Note for {editingDate}</h3>
+          <h3>Note for {editing}</h3>
           <textarea
             value={noteInput}
-            onChange={(e) => setNoteInput(e.target.value)}
+            onChange={e => setNoteInput(e.target.value)}
             rows={3}
-            cols={40}
+            cols={36}
           />
           <br />
-          <button
-            onClick={() => {
-              setNotes({ ...notes, [editingDate]: noteInput });
-              setEditingDate(null);
-              setNoteInput('');
-            }}
-            style={{ marginTop: '0.5rem' }}
-          >
-            Save Note
+          <button onClick={saveNote} style={{ marginTop: '0.5rem' }}>
+            Save
           </button>
         </div>
       )}
